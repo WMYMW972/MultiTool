@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using tool;
 
 namespace tool
 {
@@ -61,6 +62,9 @@ namespace tool
         private string _currentBvid = "";
         private List<(long cid, string name)> _currentPages = new List<(long cid, string name)>();
         private BilibiliParser _parser = new BilibiliParser();
+        private MusicParser _musicParser = new MusicParser();
+        private List<SongInfo> _currentSongs = new List<SongInfo>();
+
         private void Form1_Load(object sender, EventArgs e)
         {
             SetCueBanner(res, "粘贴B站视频链接...");
@@ -72,6 +76,7 @@ namespace tool
             checkedListBox1.Visible = false;
             comboBox5.Visible = false;
             res_dwn.Visible = false;
+            music_dw.Visible = false;
 
             // 拖放
             listBox1.AllowDrop = true;
@@ -84,6 +89,9 @@ namespace tool
             listBox2.DragDrop += listBox2_DragDrop;
             listBox3.DragEnter += ListBox_DragEnter;
             listBox3.DragDrop += listBox3_DragDrop;
+
+            // 固定 label7 标题
+            label7.Text = "音乐下载";
         }
 
         // ======================== 页面切换事件 ========================
@@ -91,9 +99,6 @@ namespace tool
         private void label1_Click(object sender, EventArgs e) { }
         private void panel1_Paint(object sender, PaintEventArgs e) { }
 
-        /// <summary>
-        /// 切换到图片转换页面
-        /// </summary>
         private void image_Click(object sender, EventArgs e)
         {
             index.Visible = false;
@@ -101,11 +106,9 @@ namespace tool
             radio.Visible = false;
             video_P.Visible = false;
             resolve.Visible = false;
+            music_dw.Visible = false;
         }
 
-        /// <summary>
-        /// 切换到音频转换页面
-        /// </summary>
         private void redio_Click(object sender, EventArgs e)
         {
             imge.Visible = false;
@@ -113,11 +116,9 @@ namespace tool
             video_P.Visible = false;
             index.Visible = false;
             resolve.Visible = false;
+            music_dw.Visible = false;
         }
 
-        /// <summary>
-        /// 切换到视频转换页面
-        /// </summary>
         private void video_Click(object sender, EventArgs e)
         {
             index.Visible = false;
@@ -125,7 +126,9 @@ namespace tool
             radio.Visible = false;
             video_P.Visible = true;
             resolve.Visible = false;
+            music_dw.Visible = false;
         }
+
         private void resolve_B_Click(object sender, EventArgs e)
         {
             index.Visible = false;
@@ -133,18 +136,37 @@ namespace tool
             radio.Visible = false;
             video_P.Visible = false;
             resolve.Visible = true;
+            music_dw.Visible = false;
         }
+
+        private void music_dw_index_Click(object sender, EventArgs e)
+        {
+            index.Visible = false;
+            imge.Visible = false;
+            radio.Visible = false;
+            video_P.Visible = false;
+            resolve.Visible = false;
+            music_dw.Visible = true;
+        }
+
+        private void m_B_index_Click(object sender, EventArgs e)
+        {
+            index.Visible = true;
+            imge.Visible = false;
+            radio.Visible = false;
+            video_P.Visible = false;
+            resolve.Visible = false;
+            music_dw.Visible = false;
+        }
+
         // ======================== 数据存储列表 ========================
 
-        private List<string> filePaths = new List<string>();          // 图片文件路径列表
-        private List<string> audioFilePaths = new List<string>();     // 音频/视频文件路径列表（用于音频转换）
-        private List<string> videoFilePaths = new List<string>();     // 视频文件路径列表
+        private List<string> filePaths = new List<string>();
+        private List<string> audioFilePaths = new List<string>();
+        private List<string> videoFilePaths = new List<string>();
 
         // ======================== 拖放事件 ========================
 
-        /// <summary>
-        /// 拖放进入时的通用处理
-        /// </summary>
         private void ListBox_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -153,16 +175,12 @@ namespace tool
                 e.Effect = DragDropEffects.None;
         }
 
-        /// <summary>
-        /// 图片列表的拖放处理 - 只接受图片文件
-        /// </summary>
         private void listBox2_DragDrop(object sender, DragEventArgs e)
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
             foreach (string file in files)
             {
                 string ext = Path.GetExtension(file).ToLower();
-                // 检查是否为支持的图片格式
                 if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp" ||
                     ext == ".gif" || ext == ".tiff" || ext == ".tif" || ext == ".webp" || ext == ".heic")
                 {
@@ -172,9 +190,6 @@ namespace tool
             }
         }
 
-        /// <summary>
-        /// 音频列表的拖放处理 - 接受音频文件 + 视频文件（视频会自动转音频）
-        /// </summary>
         private void listBox1_DragDrop(object sender, DragEventArgs e)
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -182,28 +197,22 @@ namespace tool
             {
                 string ext = Path.GetExtension(file).ToLower();
 
-                // === 音频文件 ===
                 if (ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".aac" ||
                     ext == ".m4a" || ext == ".ogg" || ext == ".wma" || ext == ".opus" || ext == ".ncm")
                 {
                     listBox1.Items.Add(Path.GetFileName(file));
                     audioFilePaths.Add(file);
                 }
-                // === 视频文件（新增支持） ===
                 else if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" ||
                          ext == ".webm" || ext == ".flv" || ext == ".wmv" || ext == ".m4v" ||
                          ext == ".ts" || ext == ".mts" || ext == ".m2ts" || ext == ".3gp")
                 {
-                    // 列表显示时加 "(视频)" 标记，让用户知道这是视频文件
                     listBox1.Items.Add(Path.GetFileName(file) + " (视频)");
                     audioFilePaths.Add(file);
                 }
             }
         }
 
-        /// <summary>
-        /// 视频列表的拖放处理 - 只接受视频文件
-        /// </summary>
         private void listBox3_DragDrop(object sender, DragEventArgs e)
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -222,9 +231,6 @@ namespace tool
 
         // ======================== 图片转换相关 ========================
 
-        /// <summary>
-        /// 图片转换 - 打开文件按钮
-        /// </summary>
         private void OpenFile_Click(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
@@ -249,12 +255,8 @@ namespace tool
         private void listBox2_SelectedIndexChanged(object sender, EventArgs e) { }
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e) { }
 
-        /// <summary>
-        /// 图片转换 - 执行转换按钮
-        /// </summary>
         private void button1_Click(object sender, EventArgs e)
         {
-            // ===== 开始处理，显示加载图标 =====
             this.Cursor = Cursors.WaitCursor;
             Application.DoEvents();
 
@@ -291,12 +293,10 @@ namespace tool
                         string nameWithoutExt = Path.GetFileNameWithoutExtension(filePaths[i]);
                         string savePath = Path.Combine(saveFolder, nameWithoutExt + "." + targetFormat.ToLower());
 
-                        // 根据选择的目标格式进行转换
                         switch (targetFormat)
                         {
                             case "JPG":
                             case "JPEG":
-                                // JPG 需要先创建白色背景再绘制（因为不支持透明通道）
                                 using (var newImage = new Image<Rgba32>(image.Width, image.Height, SixLabors.ImageSharp.Color.White))
                                 {
                                     newImage.Mutate(ctx => ctx.DrawImage(image, new SixLabors.ImageSharp.Point(0, 0), 1f));
@@ -342,7 +342,6 @@ namespace tool
             MessageBox.Show($"转换完成！成功 {successCount} 个文件。");
             System.Diagnostics.Process.Start(saveFolder);
 
-            // ===== 处理完成，恢复鼠标 =====
             this.Cursor = Cursors.Default;
         }
 
@@ -360,18 +359,13 @@ namespace tool
             imge.Visible = false;
         }
 
-        // ======================== 音频转换相关（核心功能） ========================
+        // ======================== 音频转换相关 ========================
 
         private void comboBox2_SelectedIndexChanged(object sender, EventArgs e) { }
         private void label2_Click(object sender, EventArgs e) { }
 
-        /// <summary>
-        /// 音频转换 - 执行转换按钮
-        /// 支持：音频互转 + 视频转音频（自动识别）
-        /// </summary>
         private void ra_1_Click(object sender, EventArgs e)
         {
-            // ===== 开始处理，显示加载图标 =====
             this.Cursor = Cursors.WaitCursor;
             Application.DoEvents();
 
@@ -390,7 +384,6 @@ namespace tool
             }
             string targetFormat = comboBox2.SelectedItem.ToString().ToLower();
 
-            // 检查 ffmpeg 是否存在
             string ffmpeg = GetFfmpegPath();
             if (!File.Exists(ffmpeg))
             {
@@ -416,12 +409,10 @@ namespace tool
                     string originalPath = audioFilePaths[i];
                     string ext = Path.GetExtension(currentPath).ToLower();
 
-                    // ========== 1. 判断是否为视频文件 ==========
                     bool isVideoFile = (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" ||
                                         ext == ".webm" || ext == ".flv" || ext == ".wmv" || ext == ".m4v" ||
                                         ext == ".ts" || ext == ".mts" || ext == ".m2ts" || ext == ".3gp");
 
-                    // ========== 2. 处理 NCM 加密文件（网易云音乐） ==========
                     if (ext == ".ncm")
                     {
                         string ncmdumpPath = Path.Combine(Application.StartupPath, "Tool", "ncmdump.exe");
@@ -433,7 +424,6 @@ namespace tool
                             return;
                         }
 
-                        // 调用 ncmdump.exe 解密
                         System.Diagnostics.ProcessStartInfo ncmPsi = new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = ncmdumpPath,
@@ -452,7 +442,6 @@ namespace tool
                             }
                         }
 
-                        // 查找解密后生成的文件（ncmdump 会在同目录生成同名的非 .ncm 文件）
                         string dir = Path.GetDirectoryName(currentPath);
                         string baseName = Path.GetFileNameWithoutExtension(currentPath);
                         string[] matches = Directory.GetFiles(dir, baseName + ".*")
@@ -460,7 +449,7 @@ namespace tool
                                                       .ToArray();
 
                         if (matches.Length > 0)
-                            currentPath = matches[0];  // 使用解密后的文件
+                            currentPath = matches[0];
                         else
                         {
                             MessageBox.Show($"解密后找不到文件：{Path.GetFileName(currentPath)}");
@@ -468,17 +457,13 @@ namespace tool
                         }
                     }
 
-                    // ========== 3. 构建输出路径 ==========
                     string nameWithoutExt = Path.GetFileNameWithoutExtension(originalPath);
                     string savePath = Path.Combine(saveFolder, nameWithoutExt + "." + targetFormat);
 
-                    // ========== 4. 构建 FFmpeg 参数 ==========
                     string arguments;
 
                     if (isVideoFile)
                     {
-                        // ---- 视频转音频 ----
-                        // 使用 -vn 参数忽略视频流，只提取音频
                         switch (targetFormat)
                         {
                             case "mp3":
@@ -501,22 +486,18 @@ namespace tool
                                 arguments = $"-i \"{currentPath}\" -vn -acodec libopus -b:a 128k -y \"{savePath}\"";
                                 break;
                             default:
-                                // 其他格式让 FFmpeg 自动处理
                                 arguments = $"-i \"{currentPath}\" -vn -y \"{savePath}\"";
                                 break;
                         }
                     }
                     else
                     {
-                        // ---- 音频转音频 ----
                         switch (targetFormat)
                         {
                             case "mp3":
-                                // -q:a 2 表示高质量（约 190kbps），范围 0~9
                                 arguments = $"-i \"{currentPath}\" -acodec libmp3lame -q:a 2 -y \"{savePath}\"";
                                 break;
                             case "wav":
-                                // pcm_s16le 是标准 WAV 格式，44.1kHz 立体声
                                 arguments = $"-i \"{currentPath}\" -acodec pcm_s16le -ar 44100 -ac 2 -y \"{savePath}\"";
                                 break;
                             case "flac":
@@ -533,13 +514,11 @@ namespace tool
                                 arguments = $"-i \"{currentPath}\" -acodec libopus -b:a 128k -y \"{savePath}\"";
                                 break;
                             default:
-                                // 其他格式让 FFmpeg 自动处理
                                 arguments = $"-i \"{currentPath}\" -y \"{savePath}\"";
                                 break;
                         }
                     }
 
-                    // ========== 5. 执行 FFmpeg 转换 ==========
                     System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = ffmpeg,
@@ -557,21 +536,19 @@ namespace tool
                     {
                         p.StartInfo = psi;
                         p.ErrorDataReceived += (o, args) => errorMsg += args.Data + Environment.NewLine;
-                        p.OutputDataReceived += (o, args) => { }; // 正常输出忽略
+                        p.OutputDataReceived += (o, args) => { };
 
                         p.Start();
                         p.BeginErrorReadLine();
                         p.BeginOutputReadLine();
                         p.WaitForExit();
 
-                        // ===== 只有退出码非0时才报错 =====
                         if (p.ExitCode != 0)
                         {
                             MessageBox.Show($"ffmpeg 执行失败！\n退出码：{p.ExitCode}\n错误信息：{errorMsg}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
 
-                    // ========== 6. 清理临时文件（NCM 解密产物） ==========
                     if (currentPath != originalPath && !isVideoFile)
                     {
                         try { File.Delete(currentPath); } catch { }
@@ -588,13 +565,9 @@ namespace tool
             MessageBox.Show($"转换完成！成功 {successCount} 个文件。");
             System.Diagnostics.Process.Start(saveFolder);
 
-            // ===== 处理完成，恢复鼠标 =====
             this.Cursor = Cursors.Default;
         }
 
-        /// <summary>
-        /// 音频转换 - 返回首页
-        /// </summary>
         private void ra_2_Click(object sender, EventArgs e)
         {
             imge.Visible = false;
@@ -605,9 +578,6 @@ namespace tool
         private void comboBox2_SelectedIndexChanged_1(object sender, EventArgs e) { }
         private void listBox1_SelectedIndexChanged_2(object sender, EventArgs e) { }
 
-        /// <summary>
-        /// 音频转换 - 打开文件按钮（支持音频 + 视频）
-        /// </summary>
         private void button1_Click_1(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
@@ -625,7 +595,6 @@ namespace tool
                     string ext = Path.GetExtension(filePath).ToLower();
                     string fileName = Path.GetFileName(filePath);
 
-                    // 如果是视频文件，在列表中加 "(视频)" 标记
                     if (ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" ||
                         ext == ".webm" || ext == ".flv" || ext == ".wmv" || ext == ".m4v" ||
                         ext == ".ts" || ext == ".mts" || ext == ".m2ts" || ext == ".3gp")
@@ -643,9 +612,6 @@ namespace tool
 
         // ======================== 视频转换相关 ========================
 
-        /// <summary>
-        /// 视频转换 - 返回首页
-        /// </summary>
         private void vid_bu_Click(object sender, EventArgs e)
         {
             imge.Visible = false;
@@ -654,9 +620,6 @@ namespace tool
             index.Visible = true;
         }
 
-        /// <summary>
-        /// 视频转换 - 打开文件按钮
-        /// </summary>
         private void vid_bu1_Click(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
@@ -678,12 +641,8 @@ namespace tool
             }
         }
 
-        /// <summary>
-        /// 视频转换 - 执行转换按钮
-        /// </summary>
         private void vid_bu2_Click(object sender, EventArgs e)
         {
-            // ===== 开始处理，显示加载图标 =====
             this.Cursor = Cursors.WaitCursor;
             Application.DoEvents();
 
@@ -726,8 +685,6 @@ namespace tool
                     string nameWithoutExt = Path.GetFileNameWithoutExtension(videoFilePaths[i]);
                     string savePath = Path.Combine(saveFolder, nameWithoutExt + "." + targetFormat);
 
-                    // 使用 -c:v copy 和 -c:a copy 可以快速复制流，不重新编码（速度快）
-                    // 但如果目标格式不支持原始编码，可能会失败，这里使用默认方式让 FFmpeg 自动选择
                     System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = ffmpeg,
@@ -752,7 +709,6 @@ namespace tool
             MessageBox.Show($"转换完成！成功 {successCount} 个文件。");
             System.Diagnostics.Process.Start(saveFolder);
 
-            // ===== 处理完成，恢复鼠标 =====
             this.Cursor = Cursors.Default;
         }
 
@@ -760,9 +716,6 @@ namespace tool
 
         // ======================== 删除文件按钮 ========================
 
-        /// <summary>
-        /// 从视频列表中移除选中的文件
-        /// </summary>
         private void del_vid_Click(object sender, EventArgs e)
         {
             if (listBox3.SelectedIndex < 0)
@@ -776,9 +729,6 @@ namespace tool
             videoFilePaths.RemoveAt(index);
         }
 
-        /// <summary>
-        /// 从图片列表中移除选中的文件
-        /// </summary>
         private void del_ima_Click(object sender, EventArgs e)
         {
             if (listBox2.SelectedIndex < 0)
@@ -792,9 +742,6 @@ namespace tool
             filePaths.RemoveAt(index);
         }
 
-        /// <summary>
-        /// 从音频列表中移除选中的文件
-        /// </summary>
         private void del_ra_Click(object sender, EventArgs e)
         {
             if (listBox1.SelectedIndex < 0)
@@ -808,15 +755,9 @@ namespace tool
             audioFilePaths.RemoveAt(index);
         }
 
-        private void panel2_Paint(object sender, PaintEventArgs e)
-        {
+        private void panel2_Paint(object sender, PaintEventArgs e) { }
 
-        }
-
-        private void textBox1_TextChanged(object sender, EventArgs e)
-        {
-
-        }
+        private void textBox1_TextChanged(object sender, EventArgs e) { }
 
         private string SanitizeFileName(string name)
         {
@@ -826,6 +767,8 @@ namespace tool
             }
             return name;
         }
+
+        // ======================== B站解析相关 ========================
 
         private async void res_button_Click(object sender, EventArgs e)
         {
@@ -845,11 +788,10 @@ namespace tool
                 _currentBvid = info.bvid;
                 _currentPages = info.pages;
 
-                // 标题
                 label4.Text = info.title;
                 label4.Visible = true;
                 label5.Visible = true;
-                // 封面
+
                 if (!string.IsNullOrEmpty(info.coverUrl))
                 {
                     using (var client = new HttpClient())
@@ -862,20 +804,18 @@ namespace tool
                     }
                 }
 
-                // ===== 分P列表（用 CheckedListBox）=====
                 checkedListBox1.Items.Clear();
                 int idx = 1;
                 foreach (var page in info.pages)
                 {
                     string displayName = $"{idx}. {page.name}";
-                    checkedListBox1.Items.Add(displayName, false);  // 默认不勾选
+                    checkedListBox1.Items.Add(displayName, false);
                     idx++;
                 }
                 if (checkedListBox1.Items.Count > 0)
-                    checkedListBox1.SetItemChecked(0, true);  // 默认勾选第一个
+                    checkedListBox1.SetItemChecked(0, true);
                 checkedListBox1.Visible = true;
 
-                // ===== 分辨率：只显示视频实际支持的 =====
                 comboBox5.Items.Clear();
                 for (int i = 0; i < info.acceptQuality.Count && i < info.acceptDescription.Count; i++)
                 {
@@ -898,7 +838,6 @@ namespace tool
                 this.Cursor = Cursors.Default;
                 res_button.Enabled = true;
             }
-
         }
 
         private async Task<string> DownloadAndMerge(string saveFolder, (string videoUrl, string audioUrl, string title) info)
@@ -1007,7 +946,6 @@ namespace tool
 
         private void res_del_button_Click(object sender, EventArgs e)
         {
-            // 如果有数据，询问是否清空
             if (!string.IsNullOrEmpty(_currentBvid) || checkedListBox1.Items.Count > 0)
             {
                 DialogResult result = MessageBox.Show("是否清空当前解析数据？", "提示", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -1017,7 +955,6 @@ namespace tool
                 }
             }
 
-            // 返回首页
             index.Visible = true;
             imge.Visible = true;
             redio.Visible = true;
@@ -1025,15 +962,9 @@ namespace tool
             resolve.Visible = false;
         }
 
-        private void checkBox1_CheckedChanged(object sender, EventArgs e)
-        {
+        private void checkBox1_CheckedChanged(object sender, EventArgs e) { }
 
-        }
-
-        private void comboBox5_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
+        private void comboBox5_SelectedIndexChanged(object sender, EventArgs e) { }
 
         private async void res_dwn_Click(object sender, EventArgs e)
         {
@@ -1043,7 +974,6 @@ namespace tool
                 return;
             }
 
-            // ===== 获取所有勾选的分P =====
             List<int> selectedIndices = new List<int>();
             for (int i = 0; i < checkedListBox1.Items.Count; i++)
             {
@@ -1057,7 +987,6 @@ namespace tool
                 return;
             }
 
-            // 分辨率
             string selectedText = comboBox5.SelectedItem?.ToString() ?? "1080P+ (80)";
             int qn = 80;
             if (selectedText.Contains("(") && selectedText.Contains(")"))
@@ -1095,7 +1024,6 @@ namespace tool
                             var page = _currentPages[idx];
                             var videoInfo = await _parser.ParseVideoUrlWithQuality(_currentBvid, page.cid, qn);
 
-                            // 用分P名称作为文件名
                             string title = $"{idx + 1}_{SanitizeFileName(page.name)}";
                             var infoWithTitle = (videoInfo.videoUrl, videoInfo.audioUrl, title);
 
@@ -1115,7 +1043,6 @@ namespace tool
                         }
                     }
 
-                    // ===== 全部完成后，显示汇总并打开文件夹 =====
                     string summary = $"下载完成！成功 {successCount} 个，失败 {failCount} 个";
                     if (successCount > 0)
                     {
@@ -1139,14 +1066,108 @@ namespace tool
             }
         }
 
-        private void checkedListBox1_SelectedIndexChanged(object sender, EventArgs e)
-        {
+        private void checkedListBox1_SelectedIndexChanged(object sender, EventArgs e) { }
 
+        private void label5_Click(object sender, EventArgs e) { }
+
+        private void music_dw_Paint(object sender, PaintEventArgs e) { }
+
+        private void textBox1_TextChanged_1(object sender, EventArgs e) { }
+
+        // ======================== 音乐下载相关 ========================
+
+        private void listBox4_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // label7 固定显示"音乐下载"，不做任何修改
         }
 
-        private void label5_Click(object sender, EventArgs e)
-        {
+        private void label7_Click(object sender, EventArgs e) { }
 
+        // 下载
+        private async void m_dw_b_Click(object sender, EventArgs e)
+        {
+            if (!(listBox4.SelectedItem is SongInfo song))
+            {
+                MessageBox.Show("请先选择一首歌曲", "提示");
+                return;
+            }
+
+            using (FolderBrowserDialog fbd = new FolderBrowserDialog())
+            {
+                fbd.Description = "选择保存文件夹";
+                if (fbd.ShowDialog() != DialogResult.OK)
+                    return;
+
+                string saveFolder = fbd.SelectedPath;
+
+                this.Cursor = Cursors.WaitCursor;
+                m_dw_b.Enabled = false;
+
+                try
+                {
+                    string downloadUrl = await _musicParser.GetDownloadUrl(song);
+
+                    if (string.IsNullOrEmpty(downloadUrl))
+                    {
+                        MessageBox.Show($"无法获取下载地址\n\n歌曲: {song.Name}\n歌手: {song.Artist}", "提示");
+                        return;
+                    }
+
+                    string filePath = await _musicParser.DownloadSong(saveFolder, song, downloadUrl);
+
+                    MessageBox.Show($"下载完成！\n{Path.GetFileName(filePath)}", "成功");
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"下载失败：{ex.Message}", "错误");
+                }
+                finally
+                {
+                    this.Cursor = Cursors.Default;
+                    m_dw_b.Enabled = true;
+                }
+            }
+        }
+
+        // 搜索
+        private async void sousuo_Click(object sender, EventArgs e)
+        {
+            string keyword = textBox1.Text.Trim();
+            if (string.IsNullOrEmpty(keyword))
+            {
+                MessageBox.Show("请输入歌曲名称", "提示");
+                return;
+            }
+
+            this.Cursor = Cursors.WaitCursor;
+            sousuo.Enabled = false;
+
+            try
+            {
+                var songs = await _musicParser.Search(keyword);
+                _currentSongs = songs;
+
+                listBox4.Items.Clear();
+                foreach (var song in songs)
+                {
+                    listBox4.Items.Add(song);
+                }
+
+                if (songs.Count == 0)
+                {
+                    MessageBox.Show("未找到相关歌曲", "提示");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"搜索失败：{ex.Message}", "错误");
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+                sousuo.Enabled = true;
+            }
         }
     }
 }
