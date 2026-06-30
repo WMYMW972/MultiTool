@@ -57,7 +57,8 @@
 ```text
 工具/
 ├── Tool/
-│   └── ffmpeg.exe #ncmdump，ffmpeg需自行下载
+│   └── ffmpeg.exe     
+|   └── ncmdump.exe
 ├── Properties/
 │   ├── AssemblyInfo.cs
 │   ├── Resources.Designer.cs
